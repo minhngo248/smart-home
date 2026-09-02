@@ -1,0 +1,9 @@
+[project]
+name = "tapo-klap-client"
+version = "0.1.0"
+description = "Local Tapo L530E control using python-kasa"
+requires-python = ">=3.10"
+dependencies = [
+    "python-dotenv>=1.2.3",
+    "python-kasa>=0.7.7",
+]

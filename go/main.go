@@ -15,15 +15,16 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Load variables from .env file in the current directory
-	if err := godotenv.Load(); err != nil {
-		log.Println("[!] No .env file found, falling back to system environment variables")
+	// Load variables from the repository root when running from this directory.
+	if err := godotenv.Load("../.env"); err != nil {
+		log.Println("[!] No ../.env file found, falling back to system environment variables")
 	}
 
 	deviceIP := os.Getenv("DEVICE_IP")
@@ -180,7 +181,9 @@ func sendKlapRequest(client *http.Client, deviceIP string, session *klapSession,
 	payload := append(signature[:], ciphertext...)
 
 	url := fmt.Sprintf("http://%s/app/request?seq=%d", deviceIP, session.seq)
+	klapDebug("request seq=%d url=%s plaintext=%s", session.seq, url, plaintext)
 	response := postBinary(client, url, payload)
+	klapDebug("response seq=%d status=%d body_bytes=%d", session.seq, response.status, len(response.body))
 	if response.status != http.StatusOK {
 		log.Fatalf("[-] Phase 3 failed with status %d: %s", response.status, response.body)
 	}
@@ -202,13 +205,14 @@ func sendKlapRequest(client *http.Client, deviceIP string, session *klapSession,
 	if errorCode, ok := responseValue["error_code"].(float64); ok && errorCode != 0 {
 		log.Fatalf("[-] Phase 3 device error: %v", errorCode)
 	}
+	klapDebug("response seq=%d plaintext=%s", session.seq, responsePlaintext)
 	return responsePlaintext
 }
 
 func VerifyLightState(client *http.Client, deviceIP string, session *klapSession) {
 	request := map[string]any{
 		"system": map[string]any{
-			"get_sysinfo": nil,
+			"get_sysinfo": map[string]any{},
 		},
 	}
 	plaintext, err := json.Marshal(request)
@@ -217,19 +221,33 @@ func VerifyLightState(client *http.Client, deviceIP string, session *klapSession
 	}
 	responsePlaintext := sendKlapRequest(client, deviceIP, session, plaintext)
 
-	var responseValue struct {
-		System struct {
-			SysInfo struct {
-				LightState struct {
-					OnOff int `json:"on_off"`
-				} `json:"light_state"`
-			} `json:"get_sysinfo"`
-		} `json:"system"`
-	}
+	var responseValue map[string]map[string]any
 	if err := json.Unmarshal(responsePlaintext, &responseValue); err != nil {
 		log.Fatalf("[-] Invalid light-state JSON response: %v", err)
 	}
-	fmt.Printf("[+] Verified bulb state: on_off=%d\n", responseValue.System.SysInfo.LightState.OnOff)
+	system, ok := responseValue["system"]
+	if !ok {
+		log.Fatalf("[-] State response is missing system: %s", responsePlaintext)
+	}
+	sysInfo, ok := system["get_sysinfo"].(map[string]any)
+	if !ok {
+		log.Fatalf("[-] State response is missing get_sysinfo: %s", responsePlaintext)
+	}
+	state, ok := sysInfo["light_state"].(map[string]any)
+	if !ok {
+		log.Fatalf("[-] State response is missing light_state: %s", responsePlaintext)
+	}
+	onOff, ok := state["on_off"].(float64)
+	if !ok {
+		log.Fatalf("[-] State response is missing numeric on_off: %s", responsePlaintext)
+	}
+	fmt.Printf("[+] Verified bulb state: on_off=%d\n", int(onOff))
+}
+
+func klapDebug(format string, args ...any) {
+	if enabled, _ := strconv.ParseBool(os.Getenv("KLAP_DEBUG")); enabled {
+		fmt.Printf("[DEBUG] "+format+"\n", args...)
+	}
 }
 
 type binaryResponse struct {

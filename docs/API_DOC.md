@@ -49,6 +49,40 @@ iv     = ivFull[0:12]
 seq    = signed big-endian integer from ivFull[28:32]
 ```
 
+## Debugging
+
+Run with protocol diagnostics enabled:
+
+```bash
+cd go
+KLAP_DEBUG=1 go run .
+```
+
+The debug output shows the request sequence, URL, plaintext JSON before encryption,
+HTTP status, response size, and decrypted response. Do not print credentials or
+session keys in shared logs. A signed negative sequence number can be normal because
+the initial sequence is interpreted as a signed 32-bit big-endian integer.
+
+An HTTP `200` and decrypted `{}` only show that the device returned an empty result;
+they do not prove that a light-state change was applied. The verifier therefore
+requires `system.get_sysinfo.light_state.on_off` and reports an error if that field
+is absent.
+
+## Protocol sources
+
+There is no complete public TP-Link local API specification for KLAP. The protocol
+details are reverse engineered and implemented by open-source projects. The primary
+reference used here is:
+
+- [python-kasa KLAP transport](https://github.com/python-kasa/python-kasa/blob/master/kasa/transports/klaptransport.py)
+- [python-kasa IoT bulb implementation](https://github.com/python-kasa/python-kasa/blob/master/kasa/iot/iotbulb.py)
+- [python-kasa KLAP transport tests](https://github.com/python-kasa/python-kasa/blob/master/tests/transports/test_klaptransport.py)
+- [KLAP protocol background and research](https://gist.github.com/chriswheeldon/3b17d974db3817613c69191c0480fe55)
+
+For an independent wire-level comparison, capture traffic from a known-working
+client with Wireshark or `tcpdump`, then compare the handshake bodies, cookie,
+sequence number, encrypted payload length, and decrypted JSON response.
+
 ## Phase 3 encrypted request
 
 Every command is JSON, padded with PKCS#7, and encrypted with AES-128-CBC.
@@ -65,7 +99,7 @@ Send it to `/app/request?seq=<seq>` with the `TP_SESSIONID` cookie.
 The response has the same 32-byte signature prefix and AES-CBC ciphertext.
 
 The command response may be `{}` even when the command succeeds. To verify the
-physical state, send a second encrypted request with `{"system":{"get_sysinfo":null}}`
+physical state, send a second encrypted request with `{"system":{"get_sysinfo":{}}}`
 and inspect `system.get_sysinfo.light_state.on_off` (`0` means off, `1` means on).
 
 ## Light commands
@@ -76,8 +110,10 @@ All commands use this L530E service envelope:
 {
   "smartlife.iot.smartbulb.lightingservice": {
     "transition_light_state": {
-      "...": "..."
-    }
+The current `go/main.go` performs the three phases and calls `TurnOff`:
+```bash
+cd go
+go run .
   }
 }
 ```
@@ -159,9 +195,10 @@ Set `color_temp` to `0` when using HSV color mode. For white-temperature mode, u
 
 ## Example
 
-The current `main.go` performs the three phases and calls `TurnOff`:
+The current `go/main.go` performs the three phases and calls `TurnOff`:
 
 ```bash
+cd go
 go run .
 ```
 

@@ -52,8 +52,10 @@ The first Phase 3 command sent by `TurnOff` is:
 {
   "smartlife.iot.smartbulb.lightingservice": {
     "transition_light_state": {
-      "on_off": 0,
-      "ignore_default": 1
+The current `go/main.go` performs the three phases and calls `TurnOff`:
+```bash
+cd go
+go run .
     }
   }
 }
@@ -116,4 +118,4 @@ The `TP_SESSIONID` cookie must be retained between all three phases and subseque
 | Change brightness | `ChangeBrightness` |
 | Change color | `ChangeColor` |
 | Encrypt/send/decrypt Phase 3 request | `sendKlapRequest` |
-| Verify bulb state | `verifyLightState` |
+| Verify bulb state | `VerifyLightState` |
