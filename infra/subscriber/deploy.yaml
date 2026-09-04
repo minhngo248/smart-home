@@ -22,3 +22,11 @@ spec:
         envFrom:
         - secretRef:
             name: tapo-subscriber-env
+        volumeMounts:
+        - name: mqtt-ca
+          mountPath: /app/certs
+          readOnly: true
+      volumes:
+      - name: mqtt-ca
+        secret:
+          secretName: tapo-ca-cert

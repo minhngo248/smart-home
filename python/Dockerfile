@@ -14,7 +14,6 @@ RUN useradd --no-create-home --shell /usr/sbin/nologin --uid 10001 kasa
 
 COPY --from=builder /app/.venv /app/.venv
 COPY tapo_control.py /app/tapo_control.py
-COPY certs/ /app/certs/
 
 USER kasa
 WORKDIR /app

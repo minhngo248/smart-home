@@ -16,7 +16,6 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 LOGGER = logging.getLogger(__name__)
 LIGHT_TOPIC = "/home/office/light"
-MQTT_CA_FILE = Path(__file__).parent / "certs" / "ca.crt"
 
 
 def parse_args() -> argparse.Namespace:
@@ -87,6 +86,7 @@ class MqttLightService:
         port: int,
         topic: str,
         controller: LightController,
+        ca_path: Path,
     ) -> None:
         self.topic = topic
         self.controller = controller
@@ -95,7 +95,7 @@ class MqttLightService:
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
-        self.client.tls_set(ca_certs=str(MQTT_CA_FILE))
+        self.client.tls_set(ca_certs=str(ca_path))
         self.client.connect(broker, port)
 
     def start(self) -> None:
@@ -141,6 +141,15 @@ def required_environment(name: str) -> str:
     return value
 
 
+def resolve_ca_path(value: str) -> Path:
+    ca_path = Path(value)
+    if not ca_path.is_absolute():
+        ca_path = PROJECT_ROOT / ca_path
+    if not ca_path.is_file():
+        raise RuntimeError(f"MQTT CA file does not exist: {ca_path}")
+    return ca_path
+
+
 async def main() -> None:
     args = parse_args()
     logging.basicConfig(
@@ -150,6 +159,7 @@ async def main() -> None:
     broker = required_environment("MQTT_BROKER")
     port = int(os.environ.get("MQTT_PORT", "30883"))
     topic = os.environ.get("MQTT_TOPIC", LIGHT_TOPIC)
+    ca_path = resolve_ca_path(required_environment("MQTT_CA_PATH"))
     controller = LightController(
         required_environment("DEVICE_IP"),
         required_environment("TAPO_USER"),
@@ -158,7 +168,7 @@ async def main() -> None:
     service = None
     try:
         await controller.connect()
-        service = MqttLightService(broker, port, topic, controller)
+        service = MqttLightService(broker, port, topic, controller, ca_path)
         service.start()
         stop_event = asyncio.Event()
         loop = asyncio.get_running_loop()
