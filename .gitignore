@@ -1,5 +1,8 @@
 .env
 python/.venv/
 python/__pycache__/
+
+# Certificate
 *.crt
 *.key
+*.ext
