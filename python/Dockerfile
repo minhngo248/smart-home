@@ -1,20 +1,22 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
-ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=never
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 
 WORKDIR /app
+COPY pyproject.toml uv.lock ./
 
-RUN uv pip install --system --no-cache python-kasa>=0.7.7
+RUN uv sync --frozen --no-dev --no-install-project
 
 FROM python:3.12-slim-bookworm
+LABEL org.opencontainers.image.source=https://github.com/minhngo248/smart-home
 
-# Run as non-root
-RUN useradd --no-create-home --shell /sbin/nologin kasa
+RUN useradd --no-create-home --shell /usr/sbin/nologin --uid 10001 kasa
 
-# Copy only the installed packages and the kasa binary
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin/kasa /usr/local/bin/kasa
+COPY --from=builder /app/.venv /app/.venv
+COPY tapo_control.py /app/tapo_control.py
+COPY certs/ /app/certs/
 
 USER kasa
+WORKDIR /app
+ENV PATH=/app/.venv/bin:$PATH
+ENTRYPOINT ["python", "tapo_control.py"]
