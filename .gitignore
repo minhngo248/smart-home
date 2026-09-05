@@ -1,6 +1,6 @@
 .env
-python/.venv/
-python/__pycache__/
+subscriber/.venv/
+subscriber/__pycache__/
 
 # Certificate
 *.crt
