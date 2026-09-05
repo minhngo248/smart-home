@@ -8,5 +8,5 @@ spec:
   selector:
     app: mosquitto
   ports:
-  - port: 8883
+  - port: 1883
     nodePort: 30883
