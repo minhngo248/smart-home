@@ -17,7 +17,7 @@ spec:
       - name: mosquitto
         image: eclipse-mosquitto:2.1.2-alpine
         ports:
-        - containerPort: 1883
+        - containerPort: 8883
         volumeMounts:
         - mountPath: /mosquitto/config/
           name: config

@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	_ "embed"
+	"errors"
 	"net"
 	"time"
 
@@ -11,6 +15,9 @@ import (
 	link "tinygo.org/x/espradio/netlink"
 )
 
+//go:embed certs/ca.crt
+var caCertPEM []byte
+
 // Set these via -ldflags="-X main.ssid=... -X main.password=..." at build/flash
 // time, or replace with literal values in a separate gitignored config file.
 var (
@@ -19,10 +26,10 @@ var (
 )
 
 const (
-	mqttBroker = "192.168.1.10" // hardcoded IP - skips DNS resolution entirely
-	mqttPort   = "30883"
-	mqttTopic  = "/home/office/light"
-	clientID   = "esp32-light"
+	mqttsBroker = "192.168.1.10" // hardcoded IP - skips DNS resolution entirely
+	mqttsPort   = "30883"
+	mqttTopic   = "/home/office/light"
+	clientID    = "esp32-light"
 )
 
 func main() {
@@ -58,7 +65,7 @@ func connectWifi(esplink *link.Esplink) {
 }
 
 func runMQTTLoop() {
-	server := net.JoinHostPort(mqttBroker, mqttPort)
+	server := net.JoinHostPort(mqttsBroker, mqttsPort)
 	messages := []string{"on", "off"}
 	decodeBuf := make([]byte, 1500) // allocate once, reuse across reconnects
 
@@ -68,13 +75,13 @@ func runMQTTLoop() {
 		println("---- attempt", attempt, "----")
 		println("Dialing", server)
 
-		conn, err := net.Dial("tcp", server)
+		conn, err := dialMQTTS(server)
 		if err != nil {
-			println("TCP dial failed:", err.Error())
+			println("TLS connection failed:", err.Error())
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		println("TCP connected.")
+		println("TLS connected over TCP.")
 
 		client := mqtt.NewClient(mqtt.ClientConfig{
 			Decoder: mqtt.DecoderNoAlloc{UserBuffer: decodeBuf},
@@ -131,4 +138,38 @@ func runMQTTLoop() {
 			time.Sleep(5 * time.Second)
 		}
 	}
+}
+
+// dialMQTTS opens a TCP connection to the broker and upgrades it to TLS,
+// verifying the server certificate against your own CA instead of a
+// public trust store.
+func dialMQTTS(server string) (net.Conn, error) {
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(caCertPEM) {
+		return nil, errors.New("failed to parse ca.crt")
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs: pool,
+		// ServerName must match a name/IP in the broker cert's SAN list.
+		// If your cert was issued for a hostname, use that here instead
+		// of the raw IP.
+		ServerName: mqttsBroker,
+	}
+
+	rawConn, err := net.Dial("tcp", server)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsConn := tls.Client(rawConn, tlsConfig)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
+		rawConn.Close()
+		return nil, err
+	}
+
+	return tlsConn, nil
 }

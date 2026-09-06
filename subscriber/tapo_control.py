@@ -86,7 +86,7 @@ class MqttLightService:
         port: int,
         topic: str,
         controller: LightController,
-        ca_path: Path | None,
+        ca_path: Path,
     ) -> None:
         self.topic = topic
         self.controller = controller
@@ -95,11 +95,7 @@ class MqttLightService:
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
-        if ca_path is not None:
-            LOGGER.info("Using secure MQTT connection with CA certificate %s", ca_path)
-            self.client.tls_set(ca_certs=str(ca_path))
-        else:
-            LOGGER.info("Using non-secure MQTT connection")
+        self.client.tls_set(ca_certs=str(ca_path))
         self.client.connect(broker, port)
 
     def start(self) -> None:
@@ -163,8 +159,7 @@ async def main() -> None:
     broker = required_environment("MQTT_BROKER")
     port = int(os.environ.get("MQTT_PORT", "30883"))
     topic = os.environ.get("MQTT_TOPIC", LIGHT_TOPIC)
-    ca_value = os.environ.get("MQTT_CA_PATH", "").strip()
-    ca_path = resolve_ca_path(ca_value) if ca_value else None
+    ca_path = resolve_ca_path(required_environment("MQTT_CA_PATH"))
     controller = LightController(
         required_environment("DEVICE_IP"),
         required_environment("TAPO_USER"),
