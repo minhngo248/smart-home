@@ -32,14 +32,19 @@ class LightController:
         self.device: Any = None
 
     async def connect(self) -> None:
-        self.device = await Discover.discover_single(
-            self.device_ip,
-            username=self.username,
-            password=self.password,
-        )
-        if self.device is None:
-            raise RuntimeError(f"Could not discover a device at {self.device_ip}")
-        LOGGER.info("Connected to %s (%s)", self.device_ip, self.device.model)
+        try:
+            self.device = await Discover.discover_single(
+                self.device_ip,
+                username=self.username,
+                password=self.password,
+            )
+            if self.device is None:
+                raise RuntimeError(f"Could not discover a device at {self.device_ip}")
+            LOGGER.info("Connected to %s (%s)", self.device_ip, self.device.model)
+        except Exception as error:
+            self.device = None
+            LOGGER.error("Light connection failed: %s", error)
+            raise RuntimeError(f"Light connection failed for {self.device_ip}") from error
 
     async def disconnect(self) -> None:
         if self.device is not None:
@@ -100,7 +105,18 @@ class MqttLightService:
             self.client.tls_set(ca_certs=str(ca_path))
         else:
             LOGGER.info("Using non-secure MQTT connection")
-        self.client.connect(broker, port)
+        self.broker = broker
+        self.port = port
+
+    async def connect(self) -> None:
+        try:
+            self.client.connect(self.broker, self.port)
+            LOGGER.info("MQTT TCP connection established")
+        except (OSError, mqtt.MqttException) as error:
+            LOGGER.error("MQTT connection failed: %s", error)
+            raise RuntimeError(
+                f"MQTT connection failed for {self.broker}:{self.port}"
+            ) from error
 
     def start(self) -> None:
         LOGGER.info("Subscribing to MQTT topic %s", self.topic)
@@ -174,6 +190,7 @@ async def main() -> None:
     try:
         await controller.connect()
         service = MqttLightService(broker, port, topic, controller, ca_path)
+        await service.connect()
         service.start()
         stop_event = asyncio.Event()
         loop = asyncio.get_running_loop()

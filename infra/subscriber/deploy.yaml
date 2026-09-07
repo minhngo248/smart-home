@@ -13,6 +13,7 @@ spec:
       labels:
         app: mqtt-subscriber
     spec:
+      restartPolicy: Always
       imagePullSecrets:
       - name: ghcr-credentials
       containers:
