@@ -1,0 +1,61 @@
+# Minimal host monitoring for a single-node k3s cluster.
+# node-exporter reads the Pi host metrics; Kubernetes object metrics are disabled.
+defaultRules:
+  create: false
+
+alertmanager:
+  enabled: false
+
+coreDns:
+  enabled: false
+kubeApiServer:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubelet:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+
+nodeExporter:
+  enabled: true
+  prometheus:
+    monitor:
+      enabled: true
+
+grafana:
+  enabled: true
+  ingress:
+    enabled: true
+    hosts:
+      - grafana.local-pi
+    annotations:
+      kubernetes.io/ingress.class: traefik
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - grafana.local-pi
+  persistence:
+    enabled: true
+    storageClassName: local-path
+    size: 1Gi
+
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 7d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi
