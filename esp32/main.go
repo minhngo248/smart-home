@@ -102,33 +102,22 @@ func runMQTTLoop() {
 			continue
 		}
 
-		publishFailed := false
 		var packetID uint16 = 1
-		for i := 0; ; i++ {
-			msg := messages[i%len(messages)]
-			err = client.PublishPayload(flags, mqtt.VariablesPublish{
-				TopicName:        []byte(mqttTopic),
-				PacketIdentifier: packetID,
-			}, []byte(msg))
-			if err != nil {
-				println("Publish failed:", err.Error())
-				publishFailed = true
-				break
-			}
-			println("Published:", msg)
-
-			packetID++
-			if packetID == 0 {
-				packetID = 1 // wrap around, but never land on 0
-			}
-
-			time.Sleep(30 * time.Minute) // emits events each 30 minutes
+		msg := messages[(attempt-1)%len(messages)]
+		err = client.PublishPayload(flags, mqtt.VariablesPublish{
+			TopicName:        []byte(mqttTopic),
+			PacketIdentifier: packetID,
+		}, []byte(msg))
+		if err != nil {
+			println("Publish failed:", err.Error())
+			conn.Close()
+			time.Sleep(5 * time.Second)
+			continue
 		}
+		println("Published:", msg)
 
 		conn.Close()
-		if publishFailed {
-			println("Connection dropped, reconnecting in 5s...")
-			time.Sleep(5 * time.Second)
-		}
+		println("Waiting 5 minutes before the next event.")
+		time.Sleep(5 * time.Minute)
 	}
 }
