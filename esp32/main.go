@@ -23,6 +23,10 @@ const (
 	mqttPort   = "30883"
 	mqttTopic  = "/home/office/light"
 	clientID   = "esp32-light"
+
+	backoffInitial = 5 * time.Second
+	backoffFactor  = 2
+	maxRetries     = 4
 )
 
 func main() {
@@ -40,21 +44,27 @@ func main() {
 // rate-limiting measure - a single failed attempt does not mean the
 // credentials are wrong, and retrying after a short wait often succeeds.
 func connectWifi(esplink *link.Esplink) {
-	attempt := 0
-	for {
-		attempt++
+	for attempt := 1; attempt <= maxRetries; attempt++ {
 		println("Connecting to WiFi:", ssid, "(attempt", attempt, ")")
 		err := esplink.NetConnect(&nl.ConnectParams{
 			Ssid:       ssid,
 			Passphrase: password,
 		})
 		if err == nil {
-			println("Connected to WiFi.")
+			addr, addrErr := esplink.Addr()
+			if addrErr != nil {
+				println("Connected to WiFi, but failed to read IP:", addrErr.Error())
+			} else {
+				println("Connected to WiFi. IP:", addr.String())
+			}
 			return
 		}
 		println("wifi connect failed:", err.Error())
-		time.Sleep(5 * time.Second)
+		if attempt < maxRetries {
+			time.Sleep(backoffDelay(attempt))
+		}
 	}
+	panic("WiFi connection failed after maximum retries")
 }
 
 func runMQTTLoop() {
@@ -62,62 +72,75 @@ func runMQTTLoop() {
 	messages := []string{"on", "off"}
 	decodeBuf := make([]byte, 1500) // allocate once, reuse across reconnects
 
-	attempt := 0
+	event := 0
 	for {
-		attempt++
-		println("---- attempt", attempt, "----")
-		println("Dialing", server)
-
-		conn, err := net.Dial("tcp", server)
-		if err != nil {
-			println("TCP dial failed:", err.Error())
-			time.Sleep(5 * time.Second)
-			continue
+		event++
+		msg := messages[(event-1)%len(messages)]
+		published := false
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			println("---- event", event, "attempt", attempt, "----")
+			if err := publishMQTT(server, msg, decodeBuf); err == nil {
+				published = true
+				break
+			} else {
+				println("MQTT event failed:", err.Error())
+			}
+			if attempt < maxRetries {
+				time.Sleep(backoffDelay(attempt))
+			}
 		}
-		println("TCP connected.")
-
-		client := mqtt.NewClient(mqtt.ClientConfig{
-			Decoder: mqtt.DecoderNoAlloc{UserBuffer: decodeBuf},
-		})
-
-		var connect mqtt.VariablesConnect
-		connect.SetDefaultMQTT([]byte(clientID))
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		err = client.Connect(ctx, conn, &connect)
-		cancel()
-		if err != nil {
-			println("MQTT CONNECT failed:", err.Error())
-			conn.Close()
-			time.Sleep(5 * time.Second)
-			continue
+		if !published {
+			panic("MQTT event failed after maximum retries")
 		}
-		println("MQTT connected. Publishing to", mqttTopic)
-
-		flags, err := mqtt.NewPublishFlags(mqtt.QoS0, false, false)
-		if err != nil {
-			println("Publish flags error:", err.Error())
-			conn.Close()
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
-		var packetID uint16 = 1
-		msg := messages[(attempt-1)%len(messages)]
-		err = client.PublishPayload(flags, mqtt.VariablesPublish{
-			TopicName:        []byte(mqttTopic),
-			PacketIdentifier: packetID,
-		}, []byte(msg))
-		if err != nil {
-			println("Publish failed:", err.Error())
-			conn.Close()
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		println("Published:", msg)
-
-		conn.Close()
 		println("Waiting 5 minutes before the next event.")
 		time.Sleep(5 * time.Minute)
 	}
+}
+
+func backoffDelay(attempt int) time.Duration {
+	delay := backoffInitial
+	for i := 1; i < attempt; i++ {
+		delay *= backoffFactor
+	}
+	return delay
+}
+
+func publishMQTT(server, msg string, decodeBuf []byte) error {
+	println("Dialing", server)
+	conn, err := net.Dial("tcp", server)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	println("TCP connected.")
+
+	client := mqtt.NewClient(mqtt.ClientConfig{
+		Decoder: mqtt.DecoderNoAlloc{UserBuffer: decodeBuf},
+	})
+
+	var connect mqtt.VariablesConnect
+	connect.SetDefaultMQTT([]byte(clientID))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.Connect(ctx, conn, &connect)
+	cancel()
+	if err != nil {
+		return err
+	}
+	println("MQTT connected. Publishing to", mqttTopic)
+
+	flags, err := mqtt.NewPublishFlags(mqtt.QoS0, false, false)
+	if err != nil {
+		return err
+	}
+
+	err = client.PublishPayload(flags, mqtt.VariablesPublish{
+		TopicName:        []byte(mqttTopic),
+		PacketIdentifier: 1,
+	}, []byte(msg))
+	if err != nil {
+		return err
+	}
+	println("Published:", msg)
+	return nil
 }
