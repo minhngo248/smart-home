@@ -1,0 +1,37 @@
+ingress:
+  enabled: true
+  className: traefik
+  pathType: Prefix
+  annotations:
+    cert-manager.io/cluster-issuer: ca-homelab
+  hosts:
+    - host: gitea.local-pi
+      paths:
+        - path: /
+  tls:
+    - secretName: gitea-tls
+      hosts:
+        - gitea.local-pi
+
+valkey:
+  enabled: true
+valkey-cluster:
+  enabled: false
+postgresql:
+  enabled: true
+postgresql-ha:
+  enabled: false
+
+persistence:
+  enabled: true
+  create: true
+  mount: true
+  size: 256Mi
+
+gitea:
+  config:
+    database:
+      DB_TYPE: postgres
+    indexer:
+      ISSUE_INDEXER_TYPE: bleve
+      REPO_INDEXER_ENABLED: true

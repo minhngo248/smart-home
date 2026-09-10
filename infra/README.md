@@ -47,7 +47,7 @@ kubectl create namespace monitoring
 
 helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
 	--namespace monitoring \
-	--values infra/monitoring/values.yaml
+	--values infra/monitoring/prometheus-values.yaml
 ```
 
 Wait for the workloads:

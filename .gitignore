@@ -6,3 +6,4 @@ subscriber/__pycache__/
 *.crt
 *.key
 *.ext
+*.cer
