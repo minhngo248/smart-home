@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tekton-hooks
+  namespace: tekton-pipelines
+  annotations:
+    cert-manager.io/cluster-issuer: ca-homelab
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - tekton-hooks.local-pi
+    secretName: tekton-hooks-tls
+  rules:
+  - host: tekton-hooks.local-pi
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: el-gitea-listener
+            port:
+              number: 8080

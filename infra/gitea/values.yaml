@@ -35,3 +35,16 @@ gitea:
     indexer:
       ISSUE_INDEXER_TYPE: bleve
       REPO_INDEXER_ENABLED: true
+    security:
+      ALLOWED_HOST_LIST: private
+
+extraVolumes:
+  - name: homelab-ca
+    configMap:
+      name: homelab-ca
+
+extraVolumeMounts:
+  - name: homelab-ca
+    mountPath: /usr/local/share/ca-certificates/homelab-ca.crt
+    subPath: ca.crt
+    readOnly: true

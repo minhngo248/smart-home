@@ -1,0 +1,22 @@
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: true
+  annotations:
+    cert-manager.io/cluster-issuer: ca-homelab
+  className: traefik
+  pathtype: ImplementationSpecific
+  hosts:
+    - host: zot.local-pi
+      paths:
+        - path: /
+  tls:
+    - secretName: zot-tls
+      hosts:
+        - zot.local-pi
+
+persistence: true
+
+pvc:
+  storage: 2Gi
