@@ -38,13 +38,17 @@ gitea:
     security:
       ALLOWED_HOST_LIST: private
 
+# Created with:
+# kubectl create secret generic homelab-ca \
+#  --from-file=homelab-ca.crt=./certs/ca.crt \
+#  -n gitea
 extraVolumes:
   - name: homelab-ca
-    configMap:
-      name: homelab-ca
+    secret:
+      secretName: homelab-ca
 
 extraVolumeMounts:
   - name: homelab-ca
     mountPath: /usr/local/share/ca-certificates/homelab-ca.crt
-    subPath: ca.crt
+    subPath: homelab-ca.crt
     readOnly: true
