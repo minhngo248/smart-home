@@ -1,0 +1,14 @@
+[project]
+name = "tapo-klap-client"
+version = "0.1.0"
+description = "Local Tapo L530E control using python-kasa"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "google-adk>=1.0,<2",
+    "litellm>=1.84,<2",
+    "openai>=1.0,<3",
+    "python-dotenv>=1.2.3",
+    "python-kasa>=0.7.7",
+]

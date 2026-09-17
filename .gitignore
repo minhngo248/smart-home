@@ -1,6 +1,12 @@
 .env
 subscriber/.venv/
 subscriber/__pycache__/
+tapo-backend/.venv/
+tapo-backend/__pycache__/
+tapo-backend/.env
+tapo-ui/.venv/
+tapo-ui/__pycache__/
+tapo-ui/.env
 
 # Certificate
 *.crt

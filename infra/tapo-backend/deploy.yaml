@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tapo-backend
+  namespace: default
+spec:
+  selector:
+    app: tapo-backend
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tapo-backend
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tapo-backend
+  template:
+    metadata:
+      labels:
+        app: tapo-backend
+    spec:
+      restartPolicy: Always
+      imagePullSecrets:
+      - name: ghcr-credentials
+      containers:
+      - name: tapo-backend
+        image: ghcr.io/minhngo248/smart-home/tapo-backend:v0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - secretRef:
+            name: tapo-backend-env
+        volumeMounts:
+        - name: home-config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: home-config
+        configMap:
+          name: home-config

@@ -1,0 +1,6 @@
+[project]
+name = "smart-home-ui"
+version = "0.1.0"
+description = "Streamlit controls and voice commands for the subscriber API"
+requires-python = ">=3.11"
+dependencies = ["streamlit>=1.40,<2", "requests>=2.32,<3", "python-dotenv>=1.0,<2"]

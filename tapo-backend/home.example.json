@@ -1,0 +1,16 @@
+{
+  "rooms": [
+    {
+      "id": "office",
+      "name": "Office",
+      "devices": [
+        {
+          "id": "light",
+          "name": "Desk light",
+          "type": "light",
+          "host": "<IPv4 or IPv6 of light>"
+        }
+      ]
+    }
+  ]
+}

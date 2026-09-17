@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: home-config
+  namespace: default
+data:
+  home.json: |
+    {
+      "rooms": [
+        {
+          "id": "office",
+          "name": "Office",
+          "devices": [
+            {
+              "id": "light",
+              "name": "Desk light",
+              "type": "light",
+              "host": "192.168.1.20"
+            }
+          ]
+        },
+        {
+          "id": "bedroom",
+          "name": "Bedroom",
+          "devices": [
+            {
+              "id": "light",
+              "name": "Light",
+              "type": "light",
+              "host": "192.168.1.22"
+            }
+          ]
+        }
+      ]
+    }
